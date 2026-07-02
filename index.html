@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
+<title>Interval Timer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#1a1a2e;--surface:#16213e;--card:#0f3460;
+  --work:#00d2ff;--rest:#ff6b6b;--prep:#ffd93d;
+  --text:#e8e8e8;--muted:#8899aa;--accent:#00d2ff;
+  --radius:16px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+.app{max-width:600px;margin:0 auto;padding:16px 16px 120px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:10px 0 20px}
+.header h1{font-size:44px;font-weight:700;background:linear-gradient(135deg,var(--work),#7b2ff7);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-btns{display:flex;gap:10px}
+.icon-btn{background:var(--surface);border:none;color:var(--text);width:60px;height:60px;border-radius:14px;font-size:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.icon-btn:active{transform:scale(.92)}
+
+/* Screens */
+.screen{display:none}.screen.active{display:block}
+
+/* Plan selector */
+.plan-bar{display:flex;gap:10px;overflow-x:auto;padding:4px 0 16px;scrollbar-width:none;-ms-overflow-style:none}
+.plan-bar::-webkit-scrollbar{display:none}
+.plan-chip{flex-shrink:0;padding:14px 24px;border-radius:26px;background:var(--surface);border:2px solid transparent;font-size:28px;color:var(--muted);cursor:pointer;transition:all .2s;white-space:nowrap}
+.plan-chip.active{border-color:var(--accent);color:var(--text);background:rgba(0,210,255,.1)}
+.plan-chip.add{border:2px dashed var(--muted);color:var(--muted);font-size:36px;padding:14px 20px}
+
+/* Exercise list */
+.ex-list{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.ex-card{background:var(--surface);border-radius:var(--radius);padding:20px 20px;display:flex;align-items:center;gap:16px;transition:all .2s;position:relative}
+.ex-num{width:52px;height:52px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;flex-shrink:0;color:var(--accent)}
+.ex-info{flex:1;min-width:0}
+.ex-name{font-size:32px;font-weight:600;margin-bottom:4px}
+.ex-time{font-size:26px;color:var(--muted)}
+.ex-actions{display:flex;gap:6px}
+.ex-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:8px;border-radius:10px;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.ex-btn svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ex-btn:active{color:var(--rest);transform:scale(.9)}
+.ex-btn.edit:active{color:var(--accent)}
+
+/* Add exercise */
+.add-ex-btn{width:100%;padding:20px;border-radius:var(--radius);border:2px dashed rgba(136,153,170,.3);background:transparent;color:var(--muted);font-size:30px;cursor:pointer;transition:all .2s;margin-bottom:20px}
+.add-ex-btn:active{border-color:var(--accent);color:var(--accent)}
+
+/* Settings row */
+.settings-row{background:var(--surface);border-radius:var(--radius);padding:20px 20px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.settings-row label{font-size:28px;color:var(--muted)}
+.settings-row .val{display:flex;align-items:center;gap:14px}
+.settings-row .val span{font-size:36px;font-weight:600;min-width:44px;text-align:center}
+.adj-btn{width:56px;height:56px;border-radius:14px;border:none;background:var(--card);color:var(--text);font-size:32px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.adj-btn:active{background:var(--accent);color:var(--bg)}
+
+/* Start button */
+.start-btn{width:100%;padding:22px;border-radius:var(--radius);border:none;background:linear-gradient(135deg,var(--work),#7b2ff7);color:white;font-size:36px;font-weight:700;cursor:pointer;margin-top:20px;transition:all .2s;letter-spacing:.5px}
+.start-btn:active{transform:scale(.97);opacity:.9}
+
+/* ===== TIMER SCREEN ===== */
+.timer-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100dvh - 32px);padding:16px;text-align:center}
+
+.timer-phase{font-size:32px;font-weight:600;text-transform:uppercase;letter-spacing:4px;margin-bottom:20px;opacity:.7}
+.timer-phase.work{color:var(--work)}
+.timer-phase.rest{color:var(--rest)}
+.timer-phase.prep{color:var(--prep)}
+
+.timer-circle{position:relative;width:320px;height:320px;margin:0 auto 28px}
+.timer-svg{width:100%;height:100%;transform:rotate(-90deg)}
+.timer-bg{fill:none;stroke:var(--surface);stroke-width:10}
+.timer-progress{fill:none;stroke-width:10;stroke-linecap:round;transition:stroke .3s}
+.timer-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.timer-seconds{font-size:140px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.timer-exname{font-size:36px;font-weight:600;margin-top:10px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.timer-next{font-size:28px;color:var(--muted);margin-bottom:28px;min-height:32px}
+
+.timer-progress-dots{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:28px;max-width:340px}
+.dot{width:16px;height:16px;border-radius:50%;background:var(--surface);transition:all .3s}
+.dot.done{background:var(--work)}
+.dot.current{background:var(--accent);box-shadow:0 0 12px var(--accent)}
+.dot.rest-dot{background:var(--rest);opacity:.5;width:10px;height:10px;align-self:center}
+
+.timer-controls{display:flex;gap:24px;align-items:center}
+.ctrl-btn{width:80px;height:80px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.ctrl-btn svg{stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ctrl-btn:active{transform:scale(.9)}
+.ctrl-pause{background:var(--accent);color:var(--bg);width:100px;height:100px}
+.ctrl-pause svg{width:44px;height:44px;fill:var(--bg);stroke:var(--bg)}
+.ctrl-stop{background:rgba(255,107,107,.15);color:var(--rest);border:2px solid var(--rest)}
+.ctrl-stop svg{width:32px;height:32px;fill:var(--rest);stroke:var(--rest)}
+.ctrl-skip{background:var(--surface);color:var(--text)}
+.ctrl-skip svg{width:32px;height:32px;fill:var(--text);stroke:var(--text)}
+
+/* Modal */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius);padding:28px;width:100%;max-width:420px}
+.modal h3{font-size:36px;margin-bottom:20px}
+.modal input,.modal select{width:100%;padding:18px;border-radius:14px;border:1px solid var(--card);background:var(--bg);color:var(--text);font-size:32px;margin-bottom:14px;outline:none}
+.modal input:focus{border-color:var(--accent)}
+.modal-btns{display:flex;gap:10px;margin-top:10px}
+.modal-btns button{flex:1;padding:18px;border-radius:14px;border:none;font-size:30px;font-weight:600;cursor:pointer}
+.modal-btns .cancel{background:var(--card);color:var(--text)}
+.modal-btns .confirm{background:var(--accent);color:var(--bg)}
+
+/* Rounds */
+.rounds-info{font-size:28px;color:var(--muted);margin-bottom:6px;text-align:center}
+</style>
+</head>
+<body>
+<div class="app">
+<!-- SETUP SCREEN -->
+<div class="screen active" id="setup-screen">
+  <div class="header">
+    <h1>Interval Timer</h1>
+    <div class="header-btns">
+      <button class="icon-btn" onclick="toggleSound()" id="sound-btn" title="Zvuk">🔊</button>
+    </div>
+  </div>
+
+  <div class="plan-bar" id="plan-bar"></div>
+
+  <div class="settings-row">
+    <label>Oddych medzi cvičeniami</label>
+    <div class="val">
+      <button class="adj-btn" onclick="adjRest(-5)">−</button>
+      <span id="rest-val">10</span><span style="font-size:28px;color:var(--muted)">s</span>
+      <button class="adj-btn" onclick="adjRest(5)">+</button>
+    </div>
+  </div>
+  <div class="settings-row">
+    <label>Počet kôl</label>
+    <div class="val">
+      <button class="adj-btn" onclick="adjRounds(-1)">−</button>
+      <span id="rounds-val">1</span>
+      <button class="adj-btn" onclick="adjRounds(1)">+</button>
+    </div>
+  </div>
+
+  <div class="ex-list" id="ex-list"></div>
+  <button class="add-ex-btn" onclick="openAddModal()">+ Pridať cvičenie</button>
+
+  <div style="text-align:center;font-size:28px;color:var(--muted);margin-bottom:10px" id="total-time"></div>
+  <button class="start-btn" onclick="startTimer()" id="start-btn">ŠTART</button>
+</div>
+
+<!-- TIMER SCREEN -->
+<div class="screen" id="timer-screen">
+  <div class="timer-screen">
+    <div class="rounds-info" id="round-info"></div>
+    <div class="timer-phase" id="timer-phase">PRÍPRAVA</div>
+    <div class="timer-circle">
+      <svg class="timer-svg" viewBox="0 0 320 320">
+        <circle class="timer-bg" cx="160" cy="160" r="150"/>
+        <circle class="timer-progress" id="timer-arc" cx="160" cy="160" r="150" stroke-dasharray="942.48" stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-inner">
+        <div class="timer-seconds" id="timer-seconds">5</div>
+        <div class="timer-exname" id="timer-exname">Priprav sa</div>
+      </div>
+    </div>
+    <div class="timer-next" id="timer-next"></div>
+    <div class="timer-progress-dots" id="timer-dots"></div>
+    <div class="timer-controls">
+      <button class="ctrl-btn ctrl-stop" onclick="stopTimer()"><svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
+      <button class="ctrl-btn ctrl-pause" onclick="togglePause()" id="pause-btn"><svg viewBox="0 0 24 24" id="pause-icon"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></button>
+      <button class="ctrl-btn ctrl-skip" onclick="skipPhase()"><svg viewBox="0 0 24 24"><polygon points="5,4 15,12 5,20"/><line x1="19" y1="5" x2="19" y2="19"/></svg></button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="event.target===this&&closeModal()">
+  <div class="modal">
+    <h3 id="modal-title">Pridať cvičenie</h3>
+    <input type="text" id="m-name" placeholder="Názov cvičenia" maxlength="30">
+    <input type="number" id="m-time" placeholder="Trvanie (sekundy)" min="5" max="300" value="30">
+    <div class="modal-btns">
+      <button class="cancel" onclick="closeModal()">Zrušiť</button>
+      <button class="confirm" onclick="saveExercise()">Uložiť</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAN RENAME MODAL -->
+<div class="modal-overlay" id="plan-modal" onclick="event.target===this&&closePlanModal()">
+  <div class="modal">
+    <h3>Názov tréningového plánu</h3>
+    <input type="text" id="pm-name" placeholder="Napr. HIIT 30/10" maxlength="20">
+    <div class="modal-btns">
+      <button class="cancel" onclick="closePlanModal()">Zrušiť</button>
+      <button class="confirm" onclick="savePlanName()">Uložiť</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const CIRC = 2 * Math.PI * 150;
+let plans = [];
+let activePlan = 0;
+let soundOn = true;
+let editIdx = -1;
+
+// Audio context
+let audioCtx;
+function getAudio(){if(!audioCtx)audioCtx=new(window.AudioContext||window.webkitAudioContext)();return audioCtx}
+function beep(freq=800,dur=150,times=1){
+  if(!soundOn)return;
+  const ctx=getAudio();
+  let t=ctx.currentTime;
+  for(let i=0;i<times;i++){
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);
+    o.frequency.value=freq;o.type='sine';
+    g.gain.setValueAtTime(.3,t);
+    g.gain.exponentialRampToValueAtTime(.001,t+dur/1000);
+    o.start(t);o.stop(t+dur/1000);
+    t+=dur/1000+.08;
+  }
+}
+function beepWork(){beep(1000,120,2)}
+function beepRest(){beep(600,200,1)}
+function beepDone(){beep(1200,100,4)}
+function beepTick(){beep(900,60,1)}
+
+function toggleSound(){
+  soundOn=!soundOn;
+  document.getElementById('sound-btn').textContent=soundOn?'🔊':'🔇';
+  save();
+}
+
+// ===== PLANS =====
+function defaultPlan(){
+  return {name:'Tréning 1',rest:10,rounds:1,exercises:[
+    {name:'Jumping Jacks',time:30},
+    {name:'Drepy',time:30},
+    {name:'Plank',time:30},
+    {name:'Burpees',time:30},
+    {name:'Mountain Climbers',time:30}
+  ]};
+}
+
+function load(){
+  try{
+    const d=localStorage.getItem('iTimer');
+    if(d){const p=JSON.parse(d);plans=p.plans||[];activePlan=p.active||0;soundOn=p.sound!==false}
+  }catch(e){}
+  if(!plans.length)plans=[defaultPlan()];
+  if(activePlan>=plans.length)activePlan=0;
+}
+function save(){
+  localStorage.setItem('iTimer',JSON.stringify({plans,active:activePlan,sound:soundOn}));
+}
+
+function P(){return plans[activePlan]}
+
+// ===== RENDER =====
+function renderPlans(){
+  const bar=document.getElementById('plan-bar');
+  bar.innerHTML='';
+  plans.forEach((p,i)=>{
+    const chip=document.createElement('div');
+    chip.className='plan-chip'+(i===activePlan?' active':'');
+    chip.textContent=p.name;
+    chip.onclick=()=>{activePlan=i;save();render()};
+    chip.oncontextmenu=(e)=>{e.preventDefault();openPlanRename(i)};
+    // long press for rename
+    let lt;
+    chip.ontouchstart=()=>{lt=setTimeout(()=>openPlanRename(i),600)};
+    chip.ontouchend=()=>clearTimeout(lt);
+    chip.ontouchmove=()=>clearTimeout(lt);
+    bar.appendChild(chip);
+  });
+  // Add plan
+  const add=document.createElement('div');
+  add.className='plan-chip add';add.textContent='+';
+  add.onclick=()=>{plans.push({name:'Tréning '+(plans.length+1),rest:10,rounds:1,exercises:[]});activePlan=plans.length-1;save();render()};
+  bar.appendChild(add);
+}
+
+function renderExercises(){
+  const list=document.getElementById('ex-list');
+  list.innerHTML='';
+  P().exercises.forEach((ex,i)=>{
+    const card=document.createElement('div');
+    card.className='ex-card';
+    card.innerHTML=`
+      <div class="ex-num">${i+1}</div>
+      <div class="ex-info">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-time">${ex.time}s</div>
+      </div>
+      <div class="ex-actions">
+        <button class="ex-btn edit" onclick="openEditModal(${i})"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="ex-btn" onclick="removeEx(${i})"><svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>`;
+    list.appendChild(card);
+  });
+  document.getElementById('rest-val').textContent=P().rest;
+  document.getElementById('rounds-val').textContent=P().rounds;
+
+  // Total time
+  const exs=P().exercises;
+  if(exs.length){
+    const workT=exs.reduce((s,e)=>s+e.time,0);
+    const restT=P().rest*(exs.length-1);
+    const roundT=workT+restT;
+    const total=roundT*P().rounds+P().rest*(P().rounds-1);
+    const m=Math.floor(total/60),s=total%60;
+    document.getElementById('total-time').textContent=`Celkový čas: ${m}:${String(s).padStart(2,'0')} (${P().rounds} ${P().rounds===1?'kolo':P().rounds<5?'kolá':'kôl'})`;
+  } else {
+    document.getElementById('total-time').textContent='';
+  }
+  document.getElementById('start-btn').disabled=!exs.length;
+  document.getElementById('start-btn').style.opacity=exs.length?1:.4;
+}
+
+function render(){renderPlans();renderExercises()}
+
+// ===== EXERCISE CRUD =====
+function openAddModal(){editIdx=-1;document.getElementById('modal-title').textContent='Pridať cvičenie';document.getElementById('m-name').value='';document.getElementById('m-time').value=30;document.getElementById('modal').classList.add('open');document.getElementById('m-name').focus()}
+function openEditModal(i){editIdx=i;document.getElementById('modal-title').textContent='Upraviť cvičenie';document.getElementById('m-name').value=P().exercises[i].name;document.getElementById('m-time').value=P().exercises[i].time;document.getElementById('modal').classList.add('open');document.getElementById('m-name').focus()}
+function closeModal(){document.getElementById('modal').classList.remove('open')}
+function saveExercise(){
+  const name=document.getElementById('m-name').value.trim()||('Cvičenie '+(P().exercises.length+1));
+  const time=Math.max(5,Math.min(300,parseInt(document.getElementById('m-time').value)||30));
+  if(editIdx>=0){P().exercises[editIdx]={name,time}}
+  else{P().exercises.push({name,time})}
+  save();render();closeModal();
+}
+function removeEx(i){P().exercises.splice(i,1);save();render()}
+
+function adjRest(d){P().rest=Math.max(0,Math.min(120,P().rest+d));save();render()}
+function adjRounds(d){P().rounds=Math.max(1,Math.min(10,P().rounds+d));save();render()}
+
+// Plan rename
+let renamePlanIdx=0;
+function openPlanRename(i){
+  renamePlanIdx=i;
+  document.getElementById('pm-name').value=plans[i].name;
+  document.getElementById('plan-modal').classList.add('open');
+  document.getElementById('pm-name').focus();
+}
+function closePlanModal(){document.getElementById('plan-modal').classList.remove('open')}
+function savePlanName(){
+  const n=document.getElementById('pm-name').value.trim();
+  if(n)plans[renamePlanIdx].name=n;
+  save();render();closePlanModal();
+}
+
+// ===== TIMER ENGINE =====
+let timerInterval=null;
+let paused=false;
+let phases=[];
+let phaseIdx=0;
+let timeLeft=0;
+let phaseDuration=0;
+
+function buildPhases(){
+  const exs=P().exercises;
+  phases=[];
+  const rounds=P().rounds;
+  for(let r=0;r<rounds;r++){
+    exs.forEach((ex,i)=>{
+      phases.push({type:'work',name:ex.name,time:ex.time,exIdx:i,round:r});
+      if(i<exs.length-1&&P().rest>0) phases.push({type:'rest',name:'Oddych',time:P().rest,exIdx:i,round:r});
+    });
+    if(r<rounds-1&&P().rest>0) phases.push({type:'rest',name:'Oddych medzi kolami',time:P().rest,exIdx:-1,round:r});
+  }
+}
+
+function startTimer(){
+  if(!P().exercises.length)return;
+  // Wake lock
+  try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}
+  buildPhases();
+  // 5s prep
+  phases.unshift({type:'prep',name:'Priprav sa',time:5,exIdx:-1,round:0});
+  phaseIdx=0;
+  paused=false;
+  document.getElementById('pause-btn').innerHTML='<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+  showScreen('timer-screen');
+  renderDots();
+  loadPhase();
+  runTimer();
+}
+
+function loadPhase(){
+  const ph=phases[phaseIdx];
+  timeLeft=ph.time;
+  phaseDuration=ph.time;
+  updateTimerDisplay();
+}
+
+function runTimer(){
+  if(timerInterval)clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(paused)return;
+    timeLeft--;
+    if(timeLeft<=3&&timeLeft>0)beepTick();
+    if(timeLeft<=0){
+      phaseIdx++;
+      if(phaseIdx>=phases.length){
+        beepDone();
+        finishTimer();
+        return;
+      }
+      const next=phases[phaseIdx];
+      if(next.type==='work')beepWork();
+      else beepRest();
+      loadPhase();
+      renderDots();
+    }
+    updateTimerDisplay();
+  },1000);
+}
+
+function updateTimerDisplay(){
+  const ph=phases[phaseIdx];
+  const sec=document.getElementById('timer-seconds');
+  const nm=document.getElementById('timer-exname');
+  const label=document.getElementById('timer-phase');
+  const arc=document.getElementById('timer-arc');
+  const nxt=document.getElementById('timer-next');
+  const ri=document.getElementById('round-info');
+
+  sec.textContent=timeLeft;
+  nm.textContent=ph.name;
+
+  if(ph.type==='work'){label.textContent='CVIČENIE';label.className='timer-phase work';sec.style.color='var(--work)';arc.style.stroke='var(--work)'}
+  else if(ph.type==='rest'){label.textContent='ODDYCH';label.className='timer-phase rest';sec.style.color='var(--rest)';arc.style.stroke='var(--rest)'}
+  else{label.textContent='PRÍPRAVA';label.className='timer-phase prep';sec.style.color='var(--prep)';arc.style.stroke='var(--prep)'}
+
+  const progress=1-timeLeft/phaseDuration;
+  arc.setAttribute('stroke-dashoffset',CIRC*(1-progress));
+
+  // Next
+  if(phaseIdx+1<phases.length){
+    const np=phases[phaseIdx+1];
+    nxt.textContent='Ďalej: '+np.name;
+  }else{
+    nxt.textContent=ph.type==='prep'?'':'Posledné cvičenie!';
+  }
+
+  // Round info
+  if(P().rounds>1){
+    const currentRound=ph.round+1;
+    ri.textContent=`Kolo ${currentRound} / ${P().rounds}`;
+  }else{ri.textContent=''}
+}
+
+function renderDots(){
+  const container=document.getElementById('timer-dots');
+  container.innerHTML='';
+  phases.forEach((ph,i)=>{
+    if(ph.type==='prep')return;
+    const dot=document.createElement('div');
+    dot.className='dot';
+    if(ph.type==='rest')dot.classList.add('rest-dot');
+    if(i<phaseIdx)dot.classList.add('done');
+    if(i===phaseIdx)dot.classList.add('current');
+    container.appendChild(dot);
+  });
+}
+
+function togglePause(){
+  paused=!paused;
+  document.getElementById('pause-btn').innerHTML=paused
+    ?'<svg viewBox="0 0 24 24"><polygon points="6,4 20,12 6,20"/></svg>'
+    :'<svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+}
+
+function skipPhase(){
+  phaseIdx++;
+  if(phaseIdx>=phases.length){finishTimer();return}
+  const next=phases[phaseIdx];
+  if(next.type==='work')beepWork();else beepRest();
+  loadPhase();renderDots();updateTimerDisplay();
+}
+
+function stopTimer(){
+  clearInterval(timerInterval);timerInterval=null;
+  showScreen('setup-screen');
+}
+
+function finishTimer(){
+  clearInterval(timerInterval);timerInterval=null;
+  // Show done state briefly
+  document.getElementById('timer-seconds').textContent='✓';
+  document.getElementById('timer-exname').textContent='Hotovo!';
+  document.getElementById('timer-phase').textContent='TRÉNING DOKONČENÝ';
+  document.getElementById('timer-phase').className='timer-phase work';
+  document.getElementById('timer-seconds').style.color='var(--work)';
+  document.getElementById('timer-arc').setAttribute('stroke-dashoffset','0');
+  document.getElementById('timer-arc').style.stroke='var(--work)';
+  document.getElementById('timer-next').textContent='';
+  setTimeout(()=>showScreen('setup-screen'),3000);
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// Delete plan on long press
+function deletePlan(i){
+  if(plans.length<=1)return;
+  if(confirm('Vymazať plán "'+plans[i].name+'"?')){
+    plans.splice(i,1);
+    if(activePlan>=plans.length)activePlan=plans.length-1;
+    save();render();
+  }
+}
+
+// ===== INIT =====
+load();render();
+
+// Enter key in modals
+document.getElementById('m-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveExercise()}});
+document.getElementById('m-time').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveExercise()}});
+document.getElementById('pm-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();savePlanName()}});
+</script>
+</body>
+</html>
