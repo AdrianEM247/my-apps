@@ -213,7 +213,7 @@ nav.tabs button.active svg{stroke:var(--teal)}
 <div class="overlay" id="expOverlay">
   <div class="sheet">
     <h2 id="expTitle">Nový výdavok</h2>
-    <div class="field"><label>Suma (€)</label><input type="number" inputmode="decimal" step="0.01" id="expAmount" class="amountbig" placeholder="0,00"></div>
+    <div class="field"><label>Suma (€)</label><input type="text" inputmode="decimal" id="expAmount" class="amountbig" placeholder="0,00"></div>
     <div class="field"><label>Kategória</label><div class="catpick" id="expCatPick"></div></div>
     <div class="field"><label>Popis (nepovinné)</label><input type="text" id="expNote" placeholder="napr. Lidl, nafta..."></div>
     <div class="field"><label>Dátum</label><input type="date" id="expDate"></div>
@@ -227,11 +227,23 @@ nav.tabs button.active svg{stroke:var(--teal)}
   <div class="sheet">
     <h2 id="recTitle">Opakovaná platba</h2>
     <div class="field"><label>Názov</label><input type="text" id="recName" placeholder="napr. Netflix, poistenie"></div>
-    <div class="field"><label>Suma (€)</label><input type="number" inputmode="decimal" step="0.01" id="recAmount" placeholder="0,00"></div>
-    <div class="field"><label>Kategória</label><select id="recCat"></select></div>
+    <div class="field"><label>Suma (€)</label><input type="text" inputmode="decimal" id="recAmount" placeholder="0,00"></div>
+    <div class="field"><label>Kategória</label><select id="recCat"></select>
+      <button class="addbtn" id="recNewCat" style="margin-top:8px">+ Nová kategória</button></div>
     <div class="field"><label>Deň v mesiaci</label><input type="number" min="1" max="31" id="recDay" value="1"></div>
     <div class="actions"><button class="btn ghost" id="recCancel">Zrušiť</button><button class="btn" id="recSave">Uložiť</button></div>
     <button class="btn ghost mt hidden" id="recDelete" style="color:var(--bad);border-color:var(--bad)">Vymazať</button>
+  </div>
+</div>
+
+<!-- NEW CATEGORY -->
+<div class="overlay" id="catOverlay">
+  <div class="sheet">
+    <h2>Nová kategória</h2>
+    <div class="field"><label>Názov</label><input type="text" id="catName" placeholder="napr. Pôžičky / hypotéky"></div>
+    <div class="field"><label>Ikona (emoji, nepovinné)</label><input type="text" id="catIcon" maxlength="2" placeholder="🏦"></div>
+    <div class="field"><label>Farba</label><div class="catpick" id="catColors"></div></div>
+    <div class="actions"><button class="btn ghost" id="catCancel">Zrušiť</button><button class="btn" id="catSave">Pridať</button></div>
   </div>
 </div>
 
@@ -272,6 +284,8 @@ let chartCat='all';
 let editingExpId=null;
 let editingRecId=null;
 let pickedCat='potraviny';
+let catReturn='exp';let catColor='#2f6bff';
+const PALETTE=['#2f6bff','#ef4444','#f59e0b','#22c55e','#a855f7','#ec4899','#06b6d4','#fb923c','#84cc16','#eab308','#14b8a6','#f43f5e','#8b5cf6','#0ea5e9','#94a3b8'];
 
 function load(){
   try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.expenses){s.categories=s.categories&&s.categories.length?s.categories:DEFAULT_CATS.slice();s.budgets=s.budgets||{};s.recurring=s.recurring||[];return s;}}catch(e){}
@@ -410,7 +424,7 @@ function renderBudgets(){
     else{bar=`<div class="sub">${fmt(spent)} minuté · bez limitu</div>`;}
     return `<div class="bud"><div class="ic" style="background:${c.color}22">${c.icon}</div>
       <div class="meta"><div style="font-weight:600">${c.name}</div>${bar}</div>
-      <input type="number" inputmode="decimal" placeholder="—" value="${lim||''}" data-c="${c.id}"></div>`;
+      <input type="text" inputmode="decimal" placeholder="—" value="${lim||''}" data-c="${c.id}"></div>`;
   }).join('');
   wrap.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',()=>{
     const v=parseAmt(inp.value);if(v>0)state.budgets[inp.dataset.c]=v;else delete state.budgets[inp.dataset.c];
@@ -437,8 +451,11 @@ function renderRecurring(){
 
 /* ---------- EXPENSE MODAL ---------- */
 function buildCatPick(){const p=document.getElementById('expCatPick');
-  p.innerHTML=state.categories.map(c=>`<button data-c="${c.id}"><span class="emoji">${c.icon}</span>${c.name}</button>`).join('');
-  p.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{pickedCat=b.dataset.c;markCat();}));}
+  p.innerHTML=state.categories.map(c=>`<button data-c="${c.id}"><span class="emoji">${c.icon}</span>${c.name}</button>`).join('')
+    +`<button data-c="__new__" style="border-color:var(--accent);color:var(--accent)">+ Nová</button>`;
+  p.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    if(b.dataset.c==='__new__'){openCatModal('exp');return;}
+    pickedCat=b.dataset.c;markCat();}));}
 function markCat(){document.querySelectorAll('#expCatPick button').forEach(b=>b.classList.toggle('sel',b.dataset.c===pickedCat));}
 function openExpense(id){
   editingExpId=id||null;
@@ -458,6 +475,28 @@ function saveExpense(){
   save();hideOverlay('expOverlay');if(ymOf(date)!==viewMonth)viewMonth=ymOf(date);render();
 }
 function deleteExpense(){if(!editingExpId)return;if(!confirm('Vymazať tento výdavok?'))return;state.expenses=state.expenses.filter(x=>x.id!==editingExpId);save();hideOverlay('expOverlay');render();}
+
+/* ---------- NEW CATEGORY ---------- */
+function slugify(s){const diac=new RegExp('['+String.fromCharCode(0x300)+'-'+String.fromCharCode(0x36f)+']','g');return s.toLowerCase().normalize('NFD').replace(diac,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'kat';}
+function nextColor(){const used=new Set(state.categories.map(c=>c.color));const free=PALETTE.find(c=>!used.has(c));return free||PALETTE[state.categories.length%PALETTE.length];}
+function renderCatColors(){const wrap=document.getElementById('catColors');
+  wrap.innerHTML=PALETTE.map(col=>`<button data-col="${col}" style="background:${col}22;border-color:${catColor===col?col:'transparent'}"><span class="dot" style="width:16px;height:16px;border-radius:50%;background:${col}"></span></button>`).join('');
+  wrap.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{catColor=b.dataset.col;renderCatColors();}));}
+function openCatModal(ret){catReturn=ret;catColor=nextColor();
+  document.getElementById('catName').value='';document.getElementById('catIcon').value='';
+  renderCatColors();showOverlay('catOverlay');setTimeout(()=>document.getElementById('catName').focus(),100);}
+function saveCategory(){
+  const name=document.getElementById('catName').value.trim();
+  if(!name){alert('Zadaj názov kategórie.');return;}
+  let icon=document.getElementById('catIcon').value.trim()||'🏷️';
+  let id=slugify(name);let base=id,i=2;while(state.categories.some(c=>c.id===id)){id=base+'-'+i++;}
+  state.categories.push({id,name,icon,color:catColor});save();
+  buildCatPick();buildRecCatSelect();
+  hideOverlay('catOverlay');
+  if(catReturn==='exp'){pickedCat=id;markCat();}
+  else if(catReturn==='rec'){document.getElementById('recCat').value=id;}
+  renderBudgets();
+}
 
 /* ---------- RECURRING MODAL ---------- */
 function buildRecCatSelect(){document.getElementById('recCat').innerHTML=state.categories.map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');}
@@ -524,6 +563,9 @@ document.getElementById('recSave').onclick=saveRecurring;
 document.getElementById('recCancel').onclick=()=>hideOverlay('recOverlay');
 document.getElementById('recDelete').onclick=deleteRecurring;
 document.getElementById('applyRecBtn').onclick=applyRecurring;
+document.getElementById('recNewCat').onclick=()=>openCatModal('rec');
+document.getElementById('catSave').onclick=saveCategory;
+document.getElementById('catCancel').onclick=()=>hideOverlay('catOverlay');
 document.getElementById('menuBtn').onclick=()=>showOverlay('menuOverlay');
 document.getElementById('menuClose').onclick=()=>hideOverlay('menuOverlay');
 document.getElementById('exportBtn').onclick=exportData;
