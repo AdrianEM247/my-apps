@@ -1,1 +1,539 @@
-placeholder
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#e3f5f1">
+<title>Výdavky</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f2f5f9;--card:#ffffff;--head:#e3f5f1;--head2:#d3efe8;
+  --text:#1b2436;--muted:#8994a7;--line:#eef1f6;
+  --accent:#2f6bff;--teal:#12b5a5;--good:#22c55e;--warn:#f59e0b;--bad:#ef4444;
+  --shadow:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+  --radius:18px;
+}
+html,body{background:var(--bg);color:var(--text)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:18px;min-height:100dvh;overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+.app{max-width:600px;margin:0 auto;padding:0 0 100px}
+.pad{padding:0 16px}
+h1{font-size:24px;font-weight:700}
+h2{font-size:19px;font-weight:700;margin:0 0 12px}
+.muted{color:var(--muted)}
+.small{font-size:14px}.center{text-align:center}.mt{margin-top:12px}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:16px}
+.between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
+/* header */
+header{background:var(--head);padding:16px 16px 14px;border-radius:0 0 22px 22px}
+.htop{display:flex;align-items:center;justify-content:space-between}
+.iconbtn{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.6);display:flex;align-items:center;justify-content:center}
+.iconbtn svg{width:20px;height:20px;stroke:var(--text);fill:none;stroke-width:2}
+/* month nav pill */
+.monthnav{display:flex;align-items:center;gap:6px}
+.monthnav button{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.monthnav button svg{width:16px;height:16px;stroke:var(--text);fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.monthnav .mlabel{font-size:17px;font-weight:700;text-transform:capitalize;min-width:104px;text-align:center}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin:14px 16px;box-shadow:var(--shadow)}
+
+/* summary / donut */
+.sumtop{text-align:center;margin-bottom:8px}
+.sumtop .lbl{font-size:15px;color:var(--muted)}
+.sumtop .total{font-size:40px;font-weight:800;letter-spacing:-.5px}
+.donutwrap{display:flex;justify-content:center;margin:6px 0 4px}
+svg.donut{width:210px;height:210px}
+.chips{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:14px;padding:7px 12px;border-radius:999px;background:var(--bg);color:var(--muted);display:flex;align-items:center;gap:5px}
+.chip b{color:var(--text)}
+.up{color:var(--bad)}.down{color:var(--good)}
+
+/* category rows */
+.catlist{display:flex;flex-direction:column}
+.catrow{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.catrow:last-child{border-bottom:none}
+.ic{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:23px;flex:0 0 auto}
+.catrow .meta{flex:1;min-width:0}
+.catrow .nm{font-weight:600;font-size:17px}
+.catrow .pc{font-size:14px;color:var(--muted);margin-top:2px}
+.catrow .amt{font-weight:700;white-space:nowrap}
+.bar{height:6px;border-radius:6px;background:var(--bg);overflow:hidden;margin-top:6px}
+.bar>span{display:block;height:100%;border-radius:6px}
+.empty{text-align:center;color:var(--muted);padding:26px 10px;font-size:16px}
+
+/* tx list */
+.tx{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.tx:last-child{border-bottom:none}
+.tx .meta{flex:1;min-width:0}
+.tx .t1{font-weight:600;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tx .t2{font-size:14px;color:var(--muted);margin-top:2px}
+.tx .amt{font-weight:700;white-space:nowrap}
+
+/* chart */
+.chartwrap{overflow-x:auto}
+svg.chart{display:block;width:100%;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.legend button{font-size:14px;padding:7px 12px;border-radius:999px;background:var(--bg);color:var(--muted);display:flex;align-items:center;gap:6px}
+.legend button.active{background:var(--accent);color:#fff;font-weight:700}
+.legend .dot,.dot{width:10px;height:10px;border-radius:3px}
+
+/* budgets */
+.bud{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.bud:last-child{border-bottom:none}
+.bud .meta{flex:1;min-width:0}
+.bud input{width:96px;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:10px;text-align:right}
+.budbar{height:6px;border-radius:5px;background:var(--bg);overflow:hidden;margin-top:7px}
+.budbar>span{display:block;height:100%}
+.sub{font-size:14px;color:var(--muted);margin-top:4px}
+
+/* recurring */
+.rec{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.rec:last-child{border-bottom:none}
+.rec .meta{flex:1;min-width:0}
+.switch{width:46px;height:28px;border-radius:999px;background:#d7dde8;position:relative;flex:0 0 auto;transition:background .15s}
+.switch.on{background:var(--good)}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:left .15s}
+.switch.on::after{left:21px}
+
+/* buttons */
+.btn{background:var(--accent);color:#fff;font-weight:700;border-radius:12px;padding:13px 16px;font-size:16px;text-align:center;width:100%}
+.btn.sec{background:var(--bg);color:var(--text)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+.addbtn{width:100%;border:1px dashed #c7d0de;border-radius:12px;padding:12px;color:var(--accent);font-weight:600;margin-top:12px}
+
+/* FAB */
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:82px;z-index:40;background:var(--accent);color:#fff;padding:0 24px;height:56px;border-radius:999px;font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;box-shadow:0 8px 22px rgba(47,107,255,.4)}
+.fab svg{width:22px;height:22px;stroke:#fff;stroke-width:2.6;fill:none}
+
+/* bottom nav */
+nav.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--line);display:flex;z-index:30;padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -1px 6px rgba(16,24,40,.04)}
+nav.tabs button{flex:1;padding:10px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:13px}
+nav.tabs button svg{width:25px;height:25px;stroke:var(--muted);fill:none;stroke-width:2}
+nav.tabs button.active{color:var(--teal)}
+nav.tabs button.active svg{stroke:var(--teal)}
+
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(20,28,45,.4);z-index:50;display:none;align-items:flex-end;justify-content:center}
+.overlay.show{display:flex}
+.sheet{background:#fff;width:100%;max-width:600px;border-radius:22px 22px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:92dvh;overflow-y:auto}
+.sheet h2{text-align:center}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:7px}
+.field input[type=text],.field input[type=number],.field input[type=date],.field select{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px 14px}
+.amountbig{font-size:30px;font-weight:800;text-align:center}
+.catpick{display:flex;flex-wrap:wrap;gap:8px}
+.catpick button{padding:9px 12px;border-radius:12px;background:var(--bg);color:var(--text);display:flex;align-items:center;gap:7px;font-size:14px;border:2px solid transparent}
+.catpick button.sel{border-color:var(--accent);background:#eaf1ff}
+.sheet .actions{display:flex;gap:10px;margin-top:6px}
+.sheet .actions .btn{flex:1}
+.hidden{display:none!important}
+.emoji{line-height:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="htop">
+      <h1>Výdavky</h1>
+      <button class="iconbtn" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>
+    </div>
+    <div class="between mt">
+      <div class="muted small" id="headHint">Prehľad mesiaca</div>
+      <div class="monthnav">
+        <button id="prevM" aria-label="Predchádzajúci"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <div class="mlabel" id="mLabel">—</div>
+        <button id="nextM" aria-label="Nasledujúci"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- PREHĽAD -->
+  <section id="tab-prehlad">
+    <div class="card">
+      <div class="sumtop"><div class="lbl">Minuté tento mesiac</div><div class="total" id="monthTotal">0 €</div></div>
+      <div class="donutwrap"><svg class="donut" id="donut" viewBox="0 0 160 160"></svg></div>
+      <div class="chips" id="cmpChips"></div>
+    </div>
+    <div class="card">
+      <h2>Podľa kategórií</h2>
+      <div class="catlist" id="ovCats"></div>
+    </div>
+    <div class="card">
+      <h2>Transakcie</h2>
+      <div id="txList"></div>
+    </div>
+  </section>
+
+  <!-- GRAFY -->
+  <section id="tab-grafy" class="hidden">
+    <div class="card">
+      <h2 id="chartTitle">Kategórie v čase</h2>
+      <div class="chartwrap"><svg class="chart" id="chart" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </section>
+
+  <!-- ROZPOČTY -->
+  <section id="tab-rozpocty" class="hidden">
+    <div class="card">
+      <h2>Mesačné limity</h2>
+      <div class="muted small" style="margin-bottom:8px">Nastav limit na kategóriu. Postup ukazuje míňanie za zobrazený mesiac.</div>
+      <div id="budList"></div>
+    </div>
+  </section>
+
+  <!-- OPAKOVANÉ -->
+  <section id="tab-opakovane" class="hidden">
+    <div class="card">
+      <div class="between"><h2 style="margin:0">Opakované platby</h2><div class="muted small" id="recTotal">0 €/mes</div></div>
+      <div id="recList" class="mt"></div>
+      <button class="addbtn" id="addRecBtn">+ Pridať opakovanú platbu</button>
+      <button class="btn sec mt" id="applyRecBtn">Pridať aktívne do tohto mesiaca</button>
+      <div class="muted small center mt" id="recNote"></div>
+    </div>
+  </section>
+</div>
+
+<button class="fab" id="fab"><svg viewBox="0 0 24 24" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Pridať</button>
+
+<nav class="tabs">
+  <button data-tab="prehlad" class="active"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10h14V10"/></svg>Prehľad</button>
+  <button data-tab="grafy"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Grafy</button>
+  <button data-tab="rozpocty"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Rozpočty</button>
+  <button data-tab="opakovane"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a8.5 8.5 0 1 1-2-8.9L23 10"/></svg>Opakované</button>
+</nav>
+
+<!-- ADD/EDIT EXPENSE -->
+<div class="overlay" id="expOverlay">
+  <div class="sheet">
+    <h2 id="expTitle">Nový výdavok</h2>
+    <div class="field"><label>Suma (€)</label><input type="number" inputmode="decimal" step="0.01" id="expAmount" class="amountbig" placeholder="0,00"></div>
+    <div class="field"><label>Kategória</label><div class="catpick" id="expCatPick"></div></div>
+    <div class="field"><label>Popis (nepovinné)</label><input type="text" id="expNote" placeholder="napr. Lidl, nafta..."></div>
+    <div class="field"><label>Dátum</label><input type="date" id="expDate"></div>
+    <div class="actions"><button class="btn ghost" id="expCancel">Zrušiť</button><button class="btn" id="expSave">Uložiť</button></div>
+    <button class="btn ghost mt hidden" id="expDelete" style="color:var(--bad);border-color:var(--bad)">Vymazať výdavok</button>
+  </div>
+</div>
+
+<!-- ADD/EDIT RECURRING -->
+<div class="overlay" id="recOverlay">
+  <div class="sheet">
+    <h2 id="recTitle">Opakovaná platba</h2>
+    <div class="field"><label>Názov</label><input type="text" id="recName" placeholder="napr. Netflix, poistenie"></div>
+    <div class="field"><label>Suma (€)</label><input type="number" inputmode="decimal" step="0.01" id="recAmount" placeholder="0,00"></div>
+    <div class="field"><label>Kategória</label><select id="recCat"></select></div>
+    <div class="field"><label>Deň v mesiaci</label><input type="number" min="1" max="31" id="recDay" value="1"></div>
+    <div class="actions"><button class="btn ghost" id="recCancel">Zrušiť</button><button class="btn" id="recSave">Uložiť</button></div>
+    <button class="btn ghost mt hidden" id="recDelete" style="color:var(--bad);border-color:var(--bad)">Vymazať</button>
+  </div>
+</div>
+
+<!-- MENU -->
+<div class="overlay" id="menuOverlay">
+  <div class="sheet">
+    <h2>Menu</h2>
+    <button class="btn sec mt" id="exportBtn">Zálohovať dáta (export)</button>
+    <button class="btn sec mt" id="importBtn">Obnoviť zo zálohy (import)</button>
+    <input type="file" id="importFile" accept="application/json" class="hidden">
+    <button class="btn ghost mt" id="resetBtn" style="color:var(--bad);border-color:var(--bad)">Vymazať všetky dáta</button>
+    <button class="btn ghost mt" id="menuClose">Zavrieť</button>
+    <div class="muted small center mt">Dáta sú uložené len v tomto prehliadači. Pre istotu si občas sprav zálohu.</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const KEY='vydavky_v1';
+const MONTHS=['január','február','marec','apríl','máj','jún','júl','august','september','október','november','december'];
+const DEFAULT_CATS=[
+  {id:'potraviny',name:'Potraviny',icon:'🛒',color:'#2f6bff'},
+  {id:'restauracie',name:'Reštaurácie',icon:'🍽️',color:'#ef4444'},
+  {id:'doprava',name:'Doprava',icon:'⛽',color:'#f59e0b'},
+  {id:'byvanie',name:'Bývanie',icon:'🏠',color:'#22c55e'},
+  {id:'zabava',name:'Zábava',icon:'🎬',color:'#a855f7'},
+  {id:'zdravie',name:'Zdravie',icon:'💊',color:'#ec4899'},
+  {id:'oblecenie',name:'Oblečenie',icon:'👕',color:'#06b6d4'},
+  {id:'deti',name:'Deti',icon:'🧸',color:'#fb923c'},
+  {id:'sluzby',name:'Služby',icon:'🧾',color:'#84cc16'},
+  {id:'ine',name:'Iné',icon:'📦',color:'#94a3b8'}
+];
+
+let state=load();
+let viewMonth=ymNow();
+let activeTab='prehlad';
+let chartCat='all';
+let editingExpId=null;
+let editingRecId=null;
+let pickedCat='potraviny';
+
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.expenses){s.categories=s.categories&&s.categories.length?s.categories:DEFAULT_CATS.slice();s.budgets=s.budgets||{};s.recurring=s.recurring||[];return s;}}catch(e){}
+  return {expenses:[],categories:DEFAULT_CATS.slice(),budgets:{},recurring:[]};
+}
+function save(){localStorage.setItem(KEY,JSON.stringify(state));}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function ymNow(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function todayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function ymOf(iso){return iso.slice(0,7);}
+function shiftMonth(ym,delta){let[y,m]=ym.split('-').map(Number);let idx=(y*12+(m-1))+delta;let ny=Math.floor(idx/12);let nm=idx%12;return ny+'-'+String(nm+1).padStart(2,'0');}
+function labelMonth(ym){let[y,m]=ym.split('-').map(Number);return MONTHS[m-1]+' '+y;}
+function shortMonth(ym){let[,m]=ym.split('-').map(Number);return MONTHS[m-1].slice(0,3);}
+function cat(id){return state.categories.find(c=>c.id===id)||{id:'ine',name:'Iné',icon:'📦',color:'#94a3b8'};}
+const fmt=n=>new Intl.NumberFormat('sk-SK',{style:'currency',currency:'EUR',maximumFractionDigits:2}).format(n||0);
+const fmt0=n=>new Intl.NumberFormat('sk-SK',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0);
+const parseAmt=v=>{const n=parseFloat(String(v).replace(',','.').replace(/[^0-9.\-]/g,''));return isNaN(n)?0:Math.round(n*100)/100;};
+
+function expForMonth(ym){return state.expenses.filter(e=>ymOf(e.date)===ym);}
+function totalMonth(ym){return expForMonth(ym).reduce((s,e)=>s+e.amount,0);}
+function byCatMonth(ym){const m={};expForMonth(ym).forEach(e=>{m[e.category]=(m[e.category]||0)+e.amount;});return m;}
+function lastMonths(n,end){const arr=[];for(let i=n-1;i>=0;i--)arr.push(shiftMonth(end,-i));return arr;}
+
+/* ---------- RENDER ---------- */
+function render(){
+  document.getElementById('mLabel').textContent=labelMonth(viewMonth);
+  renderOverview();renderChart();renderBudgets();renderRecurring();
+}
+
+function renderOverview(){
+  const total=totalMonth(viewMonth);
+  document.getElementById('monthTotal').textContent=fmt(total);
+  renderDonut(total);
+  // comparison chips
+  const prev=totalMonth(shiftMonth(viewMonth,-1));
+  const months=lastMonths(6,shiftMonth(viewMonth,-1));
+  const withData=months.map(totalMonth).filter(v=>v>0);
+  const avg=withData.length?withData.reduce((a,b)=>a+b,0)/withData.length:0;
+  const chips=document.getElementById('cmpChips');chips.innerHTML='';
+  chips.appendChild(cmpChip('Minulý mesiac',total,prev));
+  chips.appendChild(cmpChip('6-mes priemer',total,avg));
+  // categories
+  const bc=byCatMonth(viewMonth);
+  const ids=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]);
+  const wrap=document.getElementById('ovCats');
+  if(ids.length===0){wrap.innerHTML='<div class="empty">Zatiaľ žiadne výdavky v tomto mesiaci.</div>';}
+  else{
+    wrap.innerHTML=ids.map(id=>{
+      const c=cat(id),v=bc[id];const pct=total?Math.round(v/total*100):0;
+      const budget=state.budgets[id]||0;
+      let sub='';
+      if(budget>0){const rem=budget-v;const w=Math.min(100,Math.round(v/budget*100));const col=v>budget?'var(--bad)':c.color;
+        sub=`<div class="bar"><span style="width:${w}%;background:${col}"></span></div><div class="sub">${rem>=0?'zostáva '+fmt(rem):'prekročené o '+fmt(-rem)} z ${fmt(budget)}</div>`;}
+      return `<div class="catrow">
+        <div class="ic" style="background:${c.color}22">${c.icon}</div>
+        <div class="meta"><div class="nm">${c.name}</div><div class="pc">${pct}% z výdavkov</div>${sub}</div>
+        <div class="amt">${fmt(v)}</div></div>`;
+    }).join('');
+  }
+  // transactions
+  const list=expForMonth(viewMonth).slice().sort((a,b)=>b.date.localeCompare(a.date)||(b.created||0)-(a.created||0));
+  const tl=document.getElementById('txList');
+  if(list.length===0){tl.innerHTML='<div class="empty">Žiadne transakcie. Ťukni na „Pridať".</div>';}
+  else{
+    tl.innerHTML=list.map(e=>{const c=cat(e.category);
+      return `<div class="tx" data-id="${e.id}">
+        <div class="ic" style="background:${c.color}22">${c.icon}</div>
+        <div class="meta"><div class="t1">${e.note?escapeHtml(e.note):c.name}</div><div class="t2">${c.name} · ${fmtDate(e.date)}</div></div>
+        <div class="amt">${fmt(e.amount)}</div></div>`;
+    }).join('');
+    tl.querySelectorAll('.tx').forEach(el=>el.addEventListener('click',()=>openExpense(el.dataset.id)));
+  }
+}
+
+function renderDonut(total){
+  const svg=document.getElementById('donut');
+  const bc=byCatMonth(viewMonth);
+  const ids=Object.keys(bc).sort((a,b)=>bc[b]-bc[a]);
+  const cx=80,cy=80,r=58,sw=22,circ=2*Math.PI*r;
+  let out='';
+  if(total<=0||ids.length===0){
+    out=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eef1f6" stroke-width="${sw}"/>
+    <text x="${cx}" y="${cy-2}" text-anchor="middle" font-size="14" fill="#8994a7">Žiadne</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="14" fill="#8994a7">výdavky</text>`;
+  }else{
+    out=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#eef1f6" stroke-width="${sw}"/>`;
+    let acc=0;
+    ids.forEach(id=>{const c=cat(id),v=bc[id];const frac=v/total;const len=frac*circ;
+      out+=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c.color}" stroke-width="${sw}" stroke-dasharray="${len} ${circ-len}" stroke-dashoffset="${-acc}" transform="rotate(-90 ${cx} ${cy})"/>`;
+      acc+=len;});
+    out+=`<text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="13" fill="#8994a7">Výdavky</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" font-size="22" font-weight="800" fill="#1b2436">${fmt0(total)}</text>`;
+  }
+  svg.innerHTML=out;
+}
+
+function cmpChip(label,cur,ref){
+  const el=document.createElement('div');el.className='chip';
+  if(ref>0){const diff=cur-ref;const pct=Math.round(diff/ref*100);const up=diff>0;
+    el.innerHTML=`${label} <b class="${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(pct)}%</b>`;}
+  else{el.innerHTML=`${label} <b class="muted">—</b>`;}
+  return el;
+}
+
+function renderChart(){
+  const svg=document.getElementById('chart');
+  const months=lastMonths(6,viewMonth);
+  const vals=months.map(m=>{if(chartCat==='all')return totalMonth(m);const bc=byCatMonth(m);return bc[chartCat]||0;});
+  const max=Math.max(1,...vals);
+  const W=320,H=200,padB=28,padT=18,padL=6,padR=6;
+  const n=months.length;const gap=10;const bw=(W-padL-padR-gap*(n-1))/n;const chartH=H-padB-padT;
+  let bars='';
+  months.forEach((m,i)=>{
+    const v=vals[i];const h=Math.round(v/max*chartH);const x=padL+i*(bw+gap);const y=padT+chartH-h;
+    const col=chartCat==='all'?'#2f6bff':cat(chartCat).color;const cur=m===viewMonth;
+    bars+=`<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h,2)}" rx="6" fill="${col}" opacity="${cur?1:.45}"></rect>`;
+    if(v>0)bars+=`<text x="${x+bw/2}" y="${y-5}" text-anchor="middle" font-size="11" fill="#1b2436">${fmt0(v)}</text>`;
+    bars+=`<text x="${x+bw/2}" y="${H-8}" text-anchor="middle" font-size="12" fill="${cur?'#1b2436':'#8994a7'}" font-weight="${cur?700:400}">${shortMonth(m)}</text>`;
+  });
+  svg.innerHTML=bars;
+  document.getElementById('chartTitle').textContent=chartCat==='all'?'Celkové výdavky (6 mes.)':cat(chartCat).name+' (6 mes.)';
+  const leg=document.getElementById('legend');
+  const used=new Set();state.expenses.forEach(e=>used.add(e.category));
+  let html=`<button class="${chartCat==='all'?'active':''}" data-c="all">Všetky</button>`;
+  state.categories.filter(c=>used.has(c.id)).forEach(c=>{html+=`<button class="${chartCat===c.id?'active':''}" data-c="${c.id}"><span class="dot" style="background:${c.color}"></span>${c.name}</button>`;});
+  leg.innerHTML=html;
+  leg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{chartCat=b.dataset.c;renderChart();}));
+}
+
+function renderBudgets(){
+  const bc=byCatMonth(viewMonth);const wrap=document.getElementById('budList');
+  wrap.innerHTML=state.categories.map(c=>{
+    const spent=bc[c.id]||0;const lim=state.budgets[c.id]||0;let bar='';
+    if(lim>0){const pct=Math.min(100,Math.round(spent/lim*100));const col=spent>lim?'var(--bad)':spent>lim*0.8?'var(--warn)':'var(--good)';
+      bar=`<div class="budbar"><span style="width:${pct}%;background:${col}"></span></div><div class="sub">${fmt(spent)} z ${fmt(lim)}${spent>lim?' · prekročené':''}</div>`;}
+    else{bar=`<div class="sub">${fmt(spent)} minuté · bez limitu</div>`;}
+    return `<div class="bud"><div class="ic" style="background:${c.color}22">${c.icon}</div>
+      <div class="meta"><div style="font-weight:600">${c.name}</div>${bar}</div>
+      <input type="number" inputmode="decimal" placeholder="—" value="${lim||''}" data-c="${c.id}"></div>`;
+  }).join('');
+  wrap.querySelectorAll('input').forEach(inp=>inp.addEventListener('change',()=>{
+    const v=parseAmt(inp.value);if(v>0)state.budgets[inp.dataset.c]=v;else delete state.budgets[inp.dataset.c];
+    save();renderBudgets();renderOverview();}));
+}
+
+function renderRecurring(){
+  const wrap=document.getElementById('recList');
+  const active=state.recurring.filter(r=>r.active);
+  document.getElementById('recTotal').textContent=fmt(active.reduce((s,r)=>s+r.amount,0))+'/mes';
+  if(state.recurring.length===0){wrap.innerHTML='<div class="empty">Žiadne opakované platby.</div>';}
+  else{
+    wrap.innerHTML=state.recurring.map(r=>{const c=cat(r.category);
+      return `<div class="rec" data-id="${r.id}"><div class="ic" style="background:${c.color}22">${c.icon}</div>
+        <div class="meta rec-edit"><div style="font-weight:600">${escapeHtml(r.name)}</div><div class="sub">${fmt(r.amount)} · ${c.name} · ${r.day}. deň</div></div>
+        <div class="switch ${r.active?'on':''}" data-toggle="${r.id}"></div></div>`;
+    }).join('');
+    wrap.querySelectorAll('.rec-edit').forEach(el=>el.addEventListener('click',()=>openRecurring(el.parentElement.dataset.id)));
+    wrap.querySelectorAll('[data-toggle]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();const r=state.recurring.find(x=>x.id===el.dataset.toggle);r.active=!r.active;save();renderRecurring();}));
+  }
+  const appliedCount=expForMonth(viewMonth).filter(e=>e.recId).length;
+  document.getElementById('recNote').textContent=appliedCount?`V ${labelMonth(viewMonth)} je pridaných ${appliedCount} opakovaných platieb.`:'';
+}
+
+/* ---------- EXPENSE MODAL ---------- */
+function buildCatPick(){const p=document.getElementById('expCatPick');
+  p.innerHTML=state.categories.map(c=>`<button data-c="${c.id}"><span class="emoji">${c.icon}</span>${c.name}</button>`).join('');
+  p.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{pickedCat=b.dataset.c;markCat();}));}
+function markCat(){document.querySelectorAll('#expCatPick button').forEach(b=>b.classList.toggle('sel',b.dataset.c===pickedCat));}
+function openExpense(id){
+  editingExpId=id||null;
+  document.getElementById('expTitle').textContent=id?'Upraviť výdavok':'Nový výdavok';
+  document.getElementById('expDelete').classList.toggle('hidden',!id);
+  if(id){const e=state.expenses.find(x=>x.id===id);document.getElementById('expAmount').value=e.amount;pickedCat=e.category;document.getElementById('expNote').value=e.note||'';document.getElementById('expDate').value=e.date;}
+  else{document.getElementById('expAmount').value='';pickedCat='potraviny';document.getElementById('expNote').value='';document.getElementById('expDate').value=viewMonth===ymNow()?todayISO():viewMonth+'-01';}
+  markCat();showOverlay('expOverlay');setTimeout(()=>document.getElementById('expAmount').focus(),100);
+}
+function saveExpense(){
+  const amount=parseAmt(document.getElementById('expAmount').value);
+  if(amount<=0){alert('Zadaj sumu väčšiu ako 0.');return;}
+  const note=document.getElementById('expNote').value.trim();
+  const date=document.getElementById('expDate').value||todayISO();
+  if(editingExpId){const e=state.expenses.find(x=>x.id===editingExpId);e.amount=amount;e.category=pickedCat;e.note=note;e.date=date;}
+  else{state.expenses.push({id:uid(),amount,category:pickedCat,note,date,created:Date.now()});}
+  save();hideOverlay('expOverlay');if(ymOf(date)!==viewMonth)viewMonth=ymOf(date);render();
+}
+function deleteExpense(){if(!editingExpId)return;if(!confirm('Vymazať tento výdavok?'))return;state.expenses=state.expenses.filter(x=>x.id!==editingExpId);save();hideOverlay('expOverlay');render();}
+
+/* ---------- RECURRING MODAL ---------- */
+function buildRecCatSelect(){document.getElementById('recCat').innerHTML=state.categories.map(c=>`<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');}
+function openRecurring(id){
+  editingRecId=id||null;
+  document.getElementById('recTitle').textContent=id?'Upraviť platbu':'Nová opakovaná platba';
+  document.getElementById('recDelete').classList.toggle('hidden',!id);
+  if(id){const r=state.recurring.find(x=>x.id===id);document.getElementById('recName').value=r.name;document.getElementById('recAmount').value=r.amount;document.getElementById('recCat').value=r.category;document.getElementById('recDay').value=r.day;}
+  else{document.getElementById('recName').value='';document.getElementById('recAmount').value='';document.getElementById('recCat').value='sluzby';document.getElementById('recDay').value=1;}
+  showOverlay('recOverlay');
+}
+function saveRecurring(){
+  const name=document.getElementById('recName').value.trim();
+  const amount=parseAmt(document.getElementById('recAmount').value);
+  const category=document.getElementById('recCat').value;
+  let day=parseInt(document.getElementById('recDay').value,10)||1;day=Math.min(31,Math.max(1,day));
+  if(!name){alert('Zadaj názov.');return;}
+  if(amount<=0){alert('Zadaj sumu.');return;}
+  if(editingRecId){const r=state.recurring.find(x=>x.id===editingRecId);Object.assign(r,{name,amount,category,day});}
+  else{state.recurring.push({id:uid(),name,amount,category,day,active:true});}
+  save();hideOverlay('recOverlay');renderRecurring();
+}
+function deleteRecurring(){if(!editingRecId)return;if(!confirm('Vymazať túto platbu?'))return;state.recurring=state.recurring.filter(x=>x.id!==editingRecId);save();hideOverlay('recOverlay');renderRecurring();}
+function applyRecurring(){
+  const active=state.recurring.filter(r=>r.active);
+  if(active.length===0){alert('Nemáš žiadne aktívne opakované platby.');return;}
+  let added=0;
+  active.forEach(r=>{const exists=state.expenses.some(e=>e.recId===r.id&&ymOf(e.date)===viewMonth);
+    if(!exists){const day=String(Math.min(r.day,28)).padStart(2,'0');
+      state.expenses.push({id:uid(),amount:r.amount,category:r.category,note:r.name,date:viewMonth+'-'+day,created:Date.now(),recId:r.id});added++;}});
+  save();render();alert(added?`Pridané ${added} platieb do ${labelMonth(viewMonth)}.`:'Všetky aktívne platby už v tomto mesiaci sú.');
+}
+
+/* ---------- HELPERS ---------- */
+function fmtDate(iso){const p=iso.split('-');return p[2]+'. '+p[1]+'.';}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function showOverlay(id){document.getElementById(id).classList.add('show');}
+function hideOverlay(id){document.getElementById(id).classList.remove('show');}
+function switchTab(t){activeTab=t;
+  ['prehlad','grafy','rozpocty','opakovane'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('fab').style.display=(t==='prehlad'||t==='grafy')?'flex':'none';
+  const hints={prehlad:'Prehľad mesiaca',grafy:'Vývoj v čase',rozpocty:'Limity a rozpočty',opakovane:'Pravidelné platby'};
+  document.getElementById('headHint').textContent=hints[t];
+}
+
+/* ---------- EXPORT / IMPORT ---------- */
+function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vydavky-zaloha-'+todayISO()+'.json';a.click();}
+function importData(file){const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);
+  if(!d.expenses)throw 0;state=Object.assign({categories:DEFAULT_CATS.slice(),budgets:{},recurring:[]},d);
+  save();hideOverlay('menuOverlay');render();alert('Dáta obnovené.');}catch(e){alert('Neplatný súbor zálohy.');}};rd.readAsText(file);}
+
+/* ---------- EVENTS ---------- */
+document.getElementById('prevM').onclick=()=>{viewMonth=shiftMonth(viewMonth,-1);render();};
+document.getElementById('nextM').onclick=()=>{viewMonth=shiftMonth(viewMonth,1);render();};
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+document.getElementById('fab').onclick=()=>openExpense(null);
+document.getElementById('expSave').onclick=saveExpense;
+document.getElementById('expCancel').onclick=()=>hideOverlay('expOverlay');
+document.getElementById('expDelete').onclick=deleteExpense;
+document.getElementById('addRecBtn').onclick=()=>openRecurring(null);
+document.getElementById('recSave').onclick=saveRecurring;
+document.getElementById('recCancel').onclick=()=>hideOverlay('recOverlay');
+document.getElementById('recDelete').onclick=deleteRecurring;
+document.getElementById('applyRecBtn').onclick=applyRecurring;
+document.getElementById('menuBtn').onclick=()=>showOverlay('menuOverlay');
+document.getElementById('menuClose').onclick=()=>hideOverlay('menuOverlay');
+document.getElementById('exportBtn').onclick=exportData;
+document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+document.getElementById('importFile').onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);};
+document.getElementById('resetBtn').onclick=()=>{if(confirm('Naozaj vymazať VŠETKY dáta? Nedá sa vrátiť.')){localStorage.removeItem(KEY);state=load();hideOverlay('menuOverlay');render();}};
+document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('show');}));
+
+/* init */
+buildCatPick();buildRecCatSelect();switchTab('prehlad');render();
+</script>
+</body>
+</html>
