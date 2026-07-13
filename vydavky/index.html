@@ -247,10 +247,35 @@ nav.tabs button.active svg{stroke:var(--teal)}
   </div>
 </div>
 
+<!-- CSV IMPORT -->
+<div class="overlay" id="csvOverlay">
+  <div class="sheet">
+    <h2>Import z banky (CSV)</h2>
+    <div class="muted small center" style="margin-bottom:14px">V George si stiahni pohyby ako CSV a nahraj ich sem. Naimportujú sa len výdavky (mínusové sumy) do kategórie „Nezaradené".</div>
+    <button class="btn sec" id="csvPick">Vybrať CSV súbor</button>
+    <input type="file" id="csvFile" accept=".csv,text/csv" class="hidden">
+    <div id="csvMap" class="hidden mt">
+      <div class="field"><label>Stĺpec s dátumom</label><select id="mapDate"></select></div>
+      <div class="field"><label>Stĺpec so sumou</label><select id="mapAmount"></select></div>
+      <div class="field"><label>Stĺpec s popisom</label><select id="mapDesc"></select></div>
+      <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <input type="checkbox" id="mapOnlyExp" checked style="width:20px;height:20px">
+        <label for="mapOnlyExp" style="margin:0">Importovať len výdavky (mínusové sumy)</label>
+      </div>
+      <div class="card" style="margin:0 0 12px;background:var(--bg);box-shadow:none">
+        <div class="small muted" style="margin-bottom:8px" id="csvPreviewInfo">Náhľad</div>
+        <div id="csvPreview"></div>
+      </div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="csvCancel">Zrušiť</button><button class="btn hidden" id="csvDoImport">Importovať</button></div>
+  </div>
+</div>
+
 <!-- MENU -->
 <div class="overlay" id="menuOverlay">
   <div class="sheet">
     <h2>Menu</h2>
+    <button class="btn mt" id="csvImportBtn">Import z banky (CSV)</button>
     <button class="btn sec mt" id="exportBtn">Zálohovať dáta (export)</button>
     <button class="btn sec mt" id="importBtn">Obnoviť zo zálohy (import)</button>
     <input type="file" id="importFile" accept="application/json" class="hidden">
@@ -543,6 +568,95 @@ function switchTab(t){activeTab=t;
   document.getElementById('headHint').textContent=hints[t];
 }
 
+/* ---------- CSV IMPORT (banka) ---------- */
+let csvData=null;
+function detectDelim(text){const line=(text.split(/\r?\n/).find(l=>l.trim())||'');
+  const c={};[';',',','\t','|'].forEach(d=>c[d]=line.split(d).length);
+  return Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||',';}
+function parseCSV(text,delim){
+  text=text.replace(/^﻿/,'');const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const ch=text[i];
+    if(q){if(ch==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}
+    else{if(ch==='"')q=true;
+      else if(ch===delim){row.push(cur);cur='';}
+      else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(ch==='\r'){}
+      else cur+=ch;}}
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+function parseCsvAmount(s){if(s==null)return NaN;s=String(s).replace(/ /g,' ').trim();
+  s=s.replace(/[^\d,.\-+]/g,'');if(!s||/^[+\-]?$/.test(s))return NaN;
+  const lc=s.lastIndexOf(','),ld=s.lastIndexOf('.');
+  if(lc>-1&&ld>-1){if(lc>ld)s=s.replace(/\./g,'').replace(',','.');else s=s.replace(/,/g,'');}
+  else if(lc>-1){s=s.replace(/,/g,'.');}
+  const n=parseFloat(s);return isNaN(n)?NaN:n;}
+function parseCsvDate(s){if(!s)return null;s=String(s).trim();let m;
+  if(m=s.match(/(\d{4})-(\d{2})-(\d{2})/))return m[1]+'-'+m[2]+'-'+m[3];
+  if(m=s.match(/(\d{1,2})\s*[.\/]\s*(\d{1,2})\s*[.\/]\s*(\d{2,4})/)){
+    let d=m[1].padStart(2,'0'),mo=m[2].padStart(2,'0'),y=m[3];if(y.length===2)y='20'+y;
+    return y+'-'+mo+'-'+d;}
+  return null;}
+function openCsvImport(){csvData=null;
+  document.getElementById('csvMap').classList.add('hidden');
+  document.getElementById('csvDoImport').classList.add('hidden');
+  document.getElementById('csvFile').value='';
+  showOverlay('csvOverlay');}
+function onCsvFile(file){const rd=new FileReader();rd.onload=()=>{
+  try{
+    const text=rd.result;const delim=detectDelim(text);const rows=parseCSV(text,delim);
+    if(rows.length<2){alert('Súbor je prázdny alebo sa nepodarilo načítať.');return;}
+    const ncols=Math.max(...rows.map(r=>r.length));
+    const row0=rows[0];
+    const header=!row0.some(c=>parseCsvDate(c)); // ak v prvom riadku nie je dátum, je to hlavička
+    const dataStart=header?1:0;
+    const data=rows.slice(dataStart).filter(r=>r.length>=2);
+    // auto-detekcia stĺpcov
+    const score={date:[],amt:[],neg:[],txt:[]};
+    for(let c=0;c<ncols;c++){let d=0,a=0,neg=0,tl=0;
+      data.forEach(r=>{const v=r[c]||'';if(parseCsvDate(v))d++;const n=parseCsvAmount(v);if(!isNaN(n)){a++;if(n<0)neg++;}if(!parseCsvDate(v)&&isNaN(parseCsvAmount(v)))tl+=v.length;});
+      score.date[c]=d;score.amt[c]=a;score.neg[c]=neg;score.txt[c]=tl;}
+    const dateCol=score.date.indexOf(Math.max(...score.date));
+    let amtCol=score.neg.some(x=>x>0)?score.neg.indexOf(Math.max(...score.neg)):score.amt.indexOf(Math.max(...score.amt));
+    let descCol=0,best=-1;for(let c=0;c<ncols;c++){if(c===dateCol||c===amtCol)continue;if(score.txt[c]>best){best=score.txt[c];descCol=c;}}
+    csvData={data,ncols,labels:[]};
+    for(let c=0;c<ncols;c++){const lbl=header?(row0[c]||('Stĺpec '+(c+1))):('Stĺpec '+(c+1));
+      const sample=(data.find(r=>(r[c]||'').trim())||[])[c]||'';
+      csvData.labels[c]=lbl+(sample?' (napr. '+sample.slice(0,18)+')':'');}
+    ['mapDate','mapAmount','mapDesc'].forEach(id=>{const sel=document.getElementById(id);
+      sel.innerHTML=csvData.labels.map((l,i)=>`<option value="${i}">${escapeHtml(l)}</option>`).join('');});
+    document.getElementById('mapDate').value=dateCol;
+    document.getElementById('mapAmount').value=amtCol;
+    document.getElementById('mapDesc').value=descCol;
+    document.getElementById('csvMap').classList.remove('hidden');
+    renderCsvPreview();
+  }catch(e){alert('Nepodarilo sa spracovať CSV: '+e.message);}
+};rd.readAsText(file,'utf-8');}
+function csvKept(){const dC=+document.getElementById('mapDate').value,aC=+document.getElementById('mapAmount').value,nC=+document.getElementById('mapDesc').value;
+  const onlyExp=document.getElementById('mapOnlyExp').checked;const out=[];
+  csvData.data.forEach(r=>{const date=parseCsvDate(r[dC]);const amt=parseCsvAmount(r[aC]);
+    if(date===null||isNaN(amt)||amt===0)return;
+    if(onlyExp&&amt>=0)return;
+    out.push({date,amount:Math.abs(amt),note:(r[nC]||'').trim()});});
+  return out;}
+function renderCsvPreview(){if(!csvData)return;const kept=csvKept();
+  document.getElementById('csvPreviewInfo').textContent=`Nájdených ${csvData.data.length} riadkov · naimportuje sa ${kept.length} výdavkov`;
+  const prev=document.getElementById('csvPreview');
+  if(kept.length===0){prev.innerHTML='<div class="muted small">Nič na import — skús zmeniť priradenie stĺpcov.</div>';document.getElementById('csvDoImport').classList.add('hidden');return;}
+  prev.innerHTML=kept.slice(0,6).map(e=>`<div class="tx" style="padding:8px 0"><div class="meta"><div class="t1" style="font-size:15px">${e.note?escapeHtml(e.note):'—'}</div><div class="t2">${fmtDate(e.date)}</div></div><div class="amt">${fmt(e.amount)}</div></div>`).join('')+(kept.length>6?`<div class="muted small mt">…a ďalších ${kept.length-6}</div>`:'');
+  document.getElementById('csvDoImport').classList.remove('hidden');}
+function doCsvImport(){const kept=csvKept();if(kept.length===0)return;
+  if(!state.categories.some(c=>c.id==='nezaradene'))state.categories.push({id:'nezaradene',name:'Nezaradené',icon:'❓',color:'#94a3b8'});
+  const existing=new Set(state.expenses.map(e=>e.date+'|'+e.amount.toFixed(2)+'|'+(e.note||'')));
+  let added=0,dup=0;const seen=new Set();
+  kept.forEach(e=>{const key=e.date+'|'+e.amount.toFixed(2)+'|'+e.note;
+    if(existing.has(key)||seen.has(key)){dup++;return;}seen.add(key);
+    state.expenses.push({id:uid(),amount:e.amount,category:'nezaradene',note:e.note,date:e.date,created:Date.now(),imp:1});added++;});
+  save();buildCatPick();buildRecCatSelect();hideOverlay('csvOverlay');
+  if(added){const first=kept[0].date.slice(0,7);viewMonth=first;}
+  render();
+  alert('Naimportované '+added+' výdavkov'+(dup?' ('+dup+' duplicít preskočených)':'')+'.\nNájdeš ich v kategórii „Nezaradené" — kategórie priradíš ťuknutím na transakciu.');}
+
 /* ---------- EXPORT / IMPORT ---------- */
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='vydavky-zaloha-'+todayISO()+'.json';a.click();}
@@ -568,6 +682,12 @@ document.getElementById('catSave').onclick=saveCategory;
 document.getElementById('catCancel').onclick=()=>hideOverlay('catOverlay');
 document.getElementById('menuBtn').onclick=()=>showOverlay('menuOverlay');
 document.getElementById('menuClose').onclick=()=>hideOverlay('menuOverlay');
+document.getElementById('csvImportBtn').onclick=()=>{hideOverlay('menuOverlay');openCsvImport();};
+document.getElementById('csvPick').onclick=()=>document.getElementById('csvFile').click();
+document.getElementById('csvFile').onchange=e=>{if(e.target.files[0])onCsvFile(e.target.files[0]);};
+document.getElementById('csvCancel').onclick=()=>hideOverlay('csvOverlay');
+document.getElementById('csvDoImport').onclick=doCsvImport;
+['mapDate','mapAmount','mapDesc','mapOnlyExp'].forEach(id=>document.getElementById(id).addEventListener('change',renderCsvPreview));
 document.getElementById('exportBtn').onclick=exportData;
 document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
 document.getElementById('importFile').onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);};
