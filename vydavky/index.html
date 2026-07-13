@@ -251,13 +251,15 @@ nav.tabs button.active svg{stroke:var(--teal)}
 <div class="overlay" id="csvOverlay">
   <div class="sheet">
     <h2>Import z banky (CSV)</h2>
-    <div class="muted small center" style="margin-bottom:14px">V George si stiahni pohyby ako CSV a nahraj ich sem. Naimportujú sa len výdavky (mínusové sumy) do kategórie „Nezaradené".</div>
-    <button class="btn sec" id="csvPick">Vybrať CSV súbor</button>
-    <input type="file" id="csvFile" accept=".csv,text/csv" class="hidden">
+    <div class="muted small center" style="margin-bottom:14px">V George si stiahni pohyby ako <b>JSON</b> (odporúčané) alebo CSV a nahraj ich sem. Naimportujú sa len výdavky (mínusové sumy) do kategórie „Nezaradené".</div>
+    <button class="btn sec" id="csvPick">Vybrať súbor (JSON/CSV)</button>
+    <input type="file" id="csvFile" accept=".json,.csv,application/json,text/csv" class="hidden">
     <div id="csvMap" class="hidden mt">
-      <div class="field"><label>Stĺpec s dátumom</label><select id="mapDate"></select></div>
-      <div class="field"><label>Stĺpec so sumou</label><select id="mapAmount"></select></div>
-      <div class="field"><label>Stĺpec s popisom</label><select id="mapDesc"></select></div>
+      <div id="csvMapFields">
+        <div class="field"><label>Stĺpec s dátumom</label><select id="mapDate"></select></div>
+        <div class="field"><label>Stĺpec so sumou</label><select id="mapAmount"></select></div>
+        <div class="field"><label>Stĺpec s popisom</label><select id="mapDesc"></select></div>
+      </div>
       <div class="row" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
         <input type="checkbox" id="mapOnlyExp" checked style="width:20px;height:20px">
         <label for="mapOnlyExp" style="margin:0">Importovať len výdavky (mínusové sumy)</label>
@@ -568,8 +570,23 @@ function switchTab(t){activeTab=t;
   document.getElementById('headHint').textContent=hints[t];
 }
 
-/* ---------- CSV IMPORT (banka) ---------- */
-let csvData=null;
+/* ---------- IMPORT (banka: JSON/CSV) ---------- */
+let csvData=null;let jsonTx=null;
+function parseSlspJson(arr){return arr.map(t=>{
+  const b=t.booking||t.valuation||t.execution||t.transactionDateTime||'';
+  const date=/^\d{4}-\d{2}-\d{2}/.test(b)?b.slice(0,10):parseCsvDate(b);
+  const a=t.amount||{};const amount=(typeof a.value==='number')?a.value/Math.pow(10,a.precision||0):NaN;
+  const note=(t.partnerName||t.merchantName||t.receiverName||t.senderName||t.bookingTypeTranslation||'').trim();
+  return {date,amount,note};});}
+function decodeBuf(buf){const b=new Uint8Array(buf);let enc='utf-8';
+  if(b[0]===0xFF&&b[1]===0xFE)enc='utf-16le';
+  else if(b[0]===0xFE&&b[1]===0xFF)enc='utf-16be';
+  try{return new TextDecoder(enc).decode(b);}catch(e){return new TextDecoder('utf-8').decode(b);}}
+function unwrapDoubled(text){ // SLSP export: každý riadok je obalený v "" a vnútri sú "" zdvojené
+  if(text.indexOf(',""')<0&&text.indexOf('"",')<0)return text;
+  return text.split(/\r?\n/).map(l=>{l=l.trim();
+    if(l.length>1&&l[0]==='"'&&l[l.length-1]==='"')return l.slice(1,-1).replace(/""/g,'"');
+    return l;}).join('\n');}
 function detectDelim(text){const line=(text.split(/\r?\n/).find(l=>l.trim())||'');
   const c={};[';',',','\t','|'].forEach(d=>c[d]=line.split(d).length);
   return Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||',';}
@@ -597,14 +614,26 @@ function parseCsvDate(s){if(!s)return null;s=String(s).trim();let m;
     let d=m[1].padStart(2,'0'),mo=m[2].padStart(2,'0'),y=m[3];if(y.length===2)y='20'+y;
     return y+'-'+mo+'-'+d;}
   return null;}
-function openCsvImport(){csvData=null;
+function openCsvImport(){csvData=null;jsonTx=null;
   document.getElementById('csvMap').classList.add('hidden');
   document.getElementById('csvDoImport').classList.add('hidden');
   document.getElementById('csvFile').value='';
   showOverlay('csvOverlay');}
 function onCsvFile(file){const rd=new FileReader();rd.onload=()=>{
   try{
-    const text=rd.result;const delim=detectDelim(text);const rows=parseCSV(text,delim);
+    let text=decodeBuf(rd.result).replace(/^﻿/,'');
+    const trimmed=text.trim();
+    if(file.name.toLowerCase().endsWith('.json')||trimmed[0]==='['||trimmed[0]==='{'){
+      let arr=JSON.parse(trimmed);
+      if(!Array.isArray(arr))arr=arr.transactions||arr.items||arr.data||arr.movements||[];
+      jsonTx=parseSlspJson(arr);csvData=null;
+      document.getElementById('csvMapFields').classList.add('hidden');
+      document.getElementById('csvMap').classList.remove('hidden');
+      renderCsvPreview();return;
+    }
+    jsonTx=null;
+    text=unwrapDoubled(text);
+    const delim=detectDelim(text);const rows=parseCSV(text,delim);
     if(rows.length<2){alert('Súbor je prázdny alebo sa nepodarilo načítať.');return;}
     const ncols=Math.max(...rows.map(r=>r.length));
     const row0=rows[0];
@@ -618,7 +647,9 @@ function onCsvFile(file){const rd=new FileReader();rd.onload=()=>{
       score.date[c]=d;score.amt[c]=a;score.neg[c]=neg;score.txt[c]=tl;}
     const dateCol=score.date.indexOf(Math.max(...score.date));
     let amtCol=score.neg.some(x=>x>0)?score.neg.indexOf(Math.max(...score.neg)):score.amt.indexOf(Math.max(...score.amt));
-    let descCol=0,best=-1;for(let c=0;c<ncols;c++){if(c===dateCol||c===amtCol)continue;if(score.txt[c]>best){best=score.txt[c];descCol=c;}}
+    let descCol=0,bestD=-1;for(let c=0;c<ncols;c++){if(c===dateCol||c===amtCol)continue;
+      const set=new Set();data.forEach(r=>{const v=(r[c]||'').trim();if(v&&!parseCsvDate(v)&&isNaN(parseCsvAmount(v)))set.add(v);});
+      if(set.size>bestD){bestD=set.size;descCol=c;}}
     csvData={data,ncols,labels:[]};
     for(let c=0;c<ncols;c++){const lbl=header?(row0[c]||('Stĺpec '+(c+1))):('Stĺpec '+(c+1));
       const sample=(data.find(r=>(r[c]||'').trim())||[])[c]||'';
@@ -628,19 +659,23 @@ function onCsvFile(file){const rd=new FileReader();rd.onload=()=>{
     document.getElementById('mapDate').value=dateCol;
     document.getElementById('mapAmount').value=amtCol;
     document.getElementById('mapDesc').value=descCol;
+    document.getElementById('csvMapFields').classList.remove('hidden');
     document.getElementById('csvMap').classList.remove('hidden');
     renderCsvPreview();
   }catch(e){alert('Nepodarilo sa spracovať CSV: '+e.message);}
-};rd.readAsText(file,'utf-8');}
-function csvKept(){const dC=+document.getElementById('mapDate').value,aC=+document.getElementById('mapAmount').value,nC=+document.getElementById('mapDesc').value;
-  const onlyExp=document.getElementById('mapOnlyExp').checked;const out=[];
-  csvData.data.forEach(r=>{const date=parseCsvDate(r[dC]);const amt=parseCsvAmount(r[aC]);
-    if(date===null||isNaN(amt)||amt===0)return;
-    if(onlyExp&&amt>=0)return;
-    out.push({date,amount:Math.abs(amt),note:(r[nC]||'').trim()});});
+};rd.readAsArrayBuffer(file);}
+function csvKept(){const onlyExp=document.getElementById('mapOnlyExp').checked;let src;
+  if(jsonTx){src=jsonTx;}
+  else{const dC=+document.getElementById('mapDate').value,aC=+document.getElementById('mapAmount').value,nC=+document.getElementById('mapDesc').value;
+    src=csvData.data.map(r=>({date:parseCsvDate(r[dC]),amount:parseCsvAmount(r[aC]),note:(r[nC]||'').trim()}));}
+  const out=[];
+  src.forEach(t=>{if(t.date===null||isNaN(t.amount)||t.amount===0)return;
+    if(onlyExp&&t.amount>=0)return;
+    out.push({date:t.date,amount:Math.abs(t.amount),note:t.note});});
   return out;}
-function renderCsvPreview(){if(!csvData)return;const kept=csvKept();
-  document.getElementById('csvPreviewInfo').textContent=`Nájdených ${csvData.data.length} riadkov · naimportuje sa ${kept.length} výdavkov`;
+function renderCsvPreview(){if(!csvData&&!jsonTx)return;const kept=csvKept();
+  const totalRows=jsonTx?jsonTx.length:csvData.data.length;
+  document.getElementById('csvPreviewInfo').textContent=`Nájdených ${totalRows} pohybov · naimportuje sa ${kept.length} výdavkov`;
   const prev=document.getElementById('csvPreview');
   if(kept.length===0){prev.innerHTML='<div class="muted small">Nič na import — skús zmeniť priradenie stĺpcov.</div>';document.getElementById('csvDoImport').classList.add('hidden');return;}
   prev.innerHTML=kept.slice(0,6).map(e=>`<div class="tx" style="padding:8px 0"><div class="meta"><div class="t1" style="font-size:15px">${e.note?escapeHtml(e.note):'—'}</div><div class="t2">${fmtDate(e.date)}</div></div><div class="amt">${fmt(e.amount)}</div></div>`).join('')+(kept.length>6?`<div class="muted small mt">…a ďalších ${kept.length-6}</div>`:'');
